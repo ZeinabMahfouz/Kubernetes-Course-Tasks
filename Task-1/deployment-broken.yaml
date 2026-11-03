@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-nginx
+  labels:
+    app: hello-nginx
+spec:
+  replicas: 3                  # 3 Pods, one per node
+  selector:
+    matchLabels:
+      app: hello-nginx
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1              # add at most 1 new Pod at a time during updates
+      maxUnavailable: 0        # never remove an old Pod until a new one is Ready -> zero downtime
+  template:
+    metadata:
+      labels:
+        app: hello-nginx
+    spec:
+      shareProcessNamespace: true   # containers in the Pod can see each other's processes
+      topologySpreadConstraints:    # spread the Pods across the 3 nodes
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: hello-nginx
+
+      initContainers:
+        - name: init-done
+          image: busybox:1.36
+          command: ["sh", "-c", "echo done; exit 1"]
+
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "hello in MLOPS MENA COMMUNITY : $(date '+%Y-%m-%d %H:%M:%S')" > /usr/share/nginx/html/index.html
+              exec nginx -g 'daemon off;'
+          readinessProbe:           # Pod only gets traffic once nginx answers
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 2
+            periodSeconds: 5
+
+        - name: time-updater
+          image: busybox:1.36
+          securityContext:
+            capabilities:
+              add: ["SYS_PTRACE"]   # allows reaching nginx's files via /proc/<pid>/root
+          command: ["sh", "-c"]
+          args:
+            - |
+              while true; do
+                PID=$(pgrep -f "nginx: master" | head -n 1)
+                if [ -n "$PID" ]; then
+                  NOW=$(date '+%Y-%m-%d %H:%M:%S')
+                  echo "hello in MLOPS MENA COMMUNITY : $NOW" > /proc/$PID/root/usr/share/nginx/html/index.html
+                  echo "updated index.html (nginx pid $PID) at $NOW"
+                else
+                  echo "waiting for nginx..."
+                fi
+                sleep 5
+              done
