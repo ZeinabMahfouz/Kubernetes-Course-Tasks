@@ -1,14 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hello-nginx
+  name: web-deployment
+  namespace: webapp
   labels:
-    app: hello-nginx
+    app: web
 spec:
   replicas: 3                  # 3 Pods, one per node
   selector:
     matchLabels:
-      app: hello-nginx
+      app: web
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -17,31 +18,32 @@ spec:
   template:
     metadata:
       labels:
-        app: hello-nginx
+        app: web
     spec:
       shareProcessNamespace: true   # containers in the Pod can see each other's processes
+      # No volumes on purpose
       topologySpreadConstraints:    # spread the Pods across the 3 nodes
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app: hello-nginx
+              app: web
 
       initContainers:
         - name: init-done
           image: busybox:1.36
-          command: ["sh", "-c", "echo done; exit 1"]
+          command: ["sh", "-c", "echo 'init failed'; exit 1"]
 
       containers:
         - name: nginx
-          image: nginx:1.27-alpine
+          image: nginx:1.27
           ports:
             - containerPort: 80
-          command: ["sh", "-c"]
+          command: ["/bin/sh", "-c"]
           args:
             - |
-              echo "hello in MLOPS MENA COMMUNITY : $(date '+%Y-%m-%d %H:%M:%S')" > /usr/share/nginx/html/index.html
+              echo "<h1>hello in MLOPS MENA COMMUNITY : $(date '+%Y-%m-%d %H:%M:%S')</h1>" > /usr/share/nginx/html/index.html
               exec nginx -g 'daemon off;'
           readinessProbe:           # Pod only gets traffic once nginx answers
             httpGet:
@@ -59,10 +61,11 @@ spec:
           args:
             - |
               while true; do
-                PID=$(pgrep -f "nginx: master" | head -n 1)
+                PID=$(pgrep -o nginx)
                 if [ -n "$PID" ]; then
                   NOW=$(date '+%Y-%m-%d %H:%M:%S')
-                  echo "hello in MLOPS MENA COMMUNITY : $NOW" > /proc/$PID/root/usr/share/nginx/html/index.html
+                  echo "<h1>hello in MLOPS MENA COMMUNITY : $NOW</h1>" \
+                    > /proc/$PID/root/usr/share/nginx/html/index.html
                   echo "updated index.html (nginx pid $PID) at $NOW"
                 else
                   echo "waiting for nginx..."
