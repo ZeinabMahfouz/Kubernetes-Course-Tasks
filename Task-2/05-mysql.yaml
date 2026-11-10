@@ -47,6 +47,11 @@ spec:
           volumeMounts:
             - name: mysql-data
               mountPath: /var/lib/mysql
+          startupProbe:               # first start creates the database: allow up to 5 min
+            exec:                     # liveness/readiness only start after this succeeds
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1"]
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             exec:
               command: ["mysqladmin", "ping", "-h", "127.0.0.1"]
