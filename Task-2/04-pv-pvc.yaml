@@ -1,0 +1,40 @@
+# PersistentVolume: cluster-wide (no namespace)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+  labels:
+    app: mysql
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain   # keep the data if the PVC is deleted
+  storageClassName: manual
+  hostPath:
+    path: /data/webapp-mysql
+    type: DirectoryOrCreate
+  nodeAffinity:                            # hostPath lives on ONE node -> pin it there
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - minikube-m02
+---
+# PersistentVolumeClaim: in the app namespace, bound to mysql-pv
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: webapp-stack
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual                 # same class as the PV, otherwise minikube's "standard" is used
+  volumeName: mysql-pv
+  resources:
+    requests:
+      storage: 2Gi

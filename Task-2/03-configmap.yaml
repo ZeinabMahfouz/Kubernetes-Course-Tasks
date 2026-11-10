@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-config
+  namespace: webapp-stack
+data:
+  APP_TITLE: "hello in MLOPS MENA COMMUNITY"
+  APP_ENV: "dev"
+  MYSQL_HOST: "mysql"        # the MySQL Service name (DNS inside the namespace)
+  MYSQL_PORT: "3306"         # must be a string; also overrides the auto Service var MYSQL_PORT=tcp://...
+  MYSQL_DATABASE: "webapp"
